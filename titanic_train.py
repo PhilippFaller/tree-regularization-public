@@ -10,44 +10,43 @@ from sklearn.metrics import roc_auc_score, mean_squared_error, accuracy_score
 
 
 def preprocess(data):
-    # Title info from names
-    data["Mr"] = data["Name"].apply(lambda name: 1 if "Mr" in name and not "Mrs" in name else 0)
-    data["Miss"] = data["Name"].apply(lambda name: 1 if "Miss" in name else 0)
-    data["Mrs"] = data["Name"].apply(lambda name: 1 if "Mrs" in name else 0)
-    data["Title"] = data["Name"].apply(
-        lambda name: 1 if any([t in name for t in ["Major", "Capt", "Col", "Rev", "Master", "Dr"]]) else 0)
+    # complete missing age with median
+    dataset['Age'].fillna(dataset['Age'].median(), inplace=True)
+    # complete embarked with mode
+    dataset['Embarked'].fillna(dataset['Embarked'].mode()[0], inplace=True)
+    # complete missing fare with median
+    dataset['Fare'].fillna(dataset['Fare'].median(), inplace=True)
+    # delete the cabin feature/column and others previously stated to exclude in train dataset
+    drop_column = ['PassengerId', 'Cabin', 'Ticket']
+    dataset.drop(drop_column, axis=1, inplace=True)
 
-    # Fix format
-    data["Sex"] = data["Sex"].apply(lambda sex: 0 if sex == "male" else 1)
+    # Discrete variables
+    dataset['FamilySize'] = dataset['SibSp'] + dataset['Parch'] + 1
 
+    dataset['IsAlone'] = "Alone"  # initialize to yes/1 is alone
+    dataset['IsAlone'].loc[dataset['FamilySize'] > 1] = "Not alone"  # now update to no/0 if family size is greater than 1
+    dataset.drop(["SibSp", "Parch"], axis=1, inplace=True)
 
-    # Drop useless
-    data = data.drop("Ticket", axis=1)
-    data = data.drop("Cabin", axis=1)
-    data = data.drop("PassengerId", axis=1)
-    data = data.drop("Name", axis=1)
+    # quick and dirty code split title from name: http://www.pythonforbeginners.com/dictionary/python-split
+    dataset['Title'] = dataset['Name'].str.split(", ", expand=True)[1].str.split(".", expand=True)[0]
 
-    # Categorize
-    data["1st"] = data["Pclass"].apply(lambda t: 1 if t == 1 else 0)
-    data["2nd"] = data["Pclass"].apply(lambda t: 1 if t == 2 else 0)
-    data["3rd"] = data["Pclass"].apply(lambda t: 1 if t == 3 else 0)
-    data = data.drop("Pclass", axis=1)
-    # Just noise
-    data["Cherbourg"] = data["Embarked"].apply(lambda s: 1 if s == "C" else 0)
-    data["Queenstown"] = data["Embarked"].apply(lambda s: 1 if s == "Q" else 0)
-    data["Southampton"] = data["Embarked"].apply(lambda s: 1 if s == "S" else 0)
-    data = data.drop("Embarked", axis=1)
-    # Sanitize
-    data["Age_valid"] = data["Age"].apply(lambda a: 0 if isnan(a) else 1)
-    data["Age"] = data["Age"].apply(lambda a: -1 if isnan(a) else a)
-    data["Fare"] = data["Fare"].apply(lambda x: data["Fare"].mean() if isnan(x) else x)
+    # Continuous variable bins; qcut vs cut: https://stackoverflow.com/questions/30211923/what-is-the-difference-between-pandas-qcut-and-pandas-cut
+    # Fare Bins/Buckets using qcut or frequency bins: https://pandas.pydata.org/pandas-docs/stable/generated/pandas.qcut.html
+    #dataset['FareBin'] = pd.qcut(dataset['Fare'], 4)
 
-    # Truncate Outliers
-    data["SibSp"] = data["SibSp"].apply(lambda s: min(4, s))
-    data["Parch"] = data["Parch"].apply(lambda s: min(3, s))
-    data["Fare"] = data["Fare"].apply(lambda s: np.log(s + 1))
+    # Age Bins/Buckets using cut or value bins: https://pandas.pydata.org/pandas-docs/stable/generated/pandas.cut.html
+    #dataset['AgeBin'] = pd.cut(dataset['Age'].astype(int), 5)
 
-    return data
+    # cleanup rare title names
+    # print(data1['Title'].value_counts())
+    stat_min = 10  # while small is arbitrary, we'll use the common minimum in statistics: http://nicholasjjackson.com/2012/03/08/sample-size-is-10-a-magic-number/
+    title_names = (dataset['Title'].value_counts() < stat_min)  # this will create a true false series with title name as index
+
+    # apply and lambda functions are quick and dirty code to find and replace with fewer lines of code: https://community.modeanalytics.com/python/tutorial/pandas-groupby-and-python-lambda-functions/
+    dataset['Title'] = dataset['Title'].apply(lambda x: 'Misc' if title_names.loc[x] == True else x)
+    dataset.drop("Name", axis=1, inplace=True)
+
+    return pd.get_dummies(data)
 
 
 if __name__ == "__main__":
