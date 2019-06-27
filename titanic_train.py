@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, mean_squared_error, accuracy_score
 
 
-def preprocess(data):
+def preprocess(dataset):
     # complete missing age with median
     dataset['Age'].fillna(dataset['Age'].median(), inplace=True)
     # complete embarked with mode
@@ -46,7 +46,7 @@ def preprocess(data):
     dataset['Title'] = dataset['Title'].apply(lambda x: 'Misc' if title_names.loc[x] == True else x)
     dataset.drop("Name", axis=1, inplace=True)
 
-    return pd.get_dummies(data)
+    return pd.get_dummies(dataset)
 
 
 if __name__ == "__main__":
